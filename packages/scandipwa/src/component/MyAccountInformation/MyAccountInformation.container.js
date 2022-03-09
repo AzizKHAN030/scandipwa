@@ -16,12 +16,12 @@ import { withRouter } from 'react-router';
 
 import MyAccountQuery from 'Query/MyAccount.query';
 import { ACCOUNT_LOGIN_URL, ACCOUNT_URL } from 'Route/MyAccount/MyAccount.config';
-import { updateCustomerDetails, updateIsLoading, updateIsLocked } from 'Store/MyAccount/MyAccount.action';
+import { updateCustomerDetails, updateIsLoading } from 'Store/MyAccount/MyAccount.action';
 import { CUSTOMER } from 'Store/MyAccount/MyAccount.dispatcher';
 import { showNotification } from 'Store/Notification/Notification.action';
 import { CustomerType } from 'Type/Account.type';
 import { LocationType } from 'Type/Router.type';
-import { isSignedIn } from 'Util/Auth';
+import { GRAPHQL_AUTH, isSignedIn } from 'Util/Auth';
 import BrowserDatabase from 'Util/BrowserDatabase';
 import history from 'Util/History';
 import { fetchMutation, getErrorMessage } from 'Util/Request';
@@ -55,8 +55,7 @@ export const mapDispatchToProps = (dispatch) => ({
     updateCustomerLoadingStatus: (status) => dispatch(updateIsLoading(status)),
     logout: () => MyAccountDispatcher.then(
         ({ default: dispatcher }) => dispatcher.logout(false, false, dispatch)
-    ),
-    updateIsLocked: (isLocked) => dispatch(updateIsLocked(isLocked))
+    )
 });
 
 /** @namespace Component/MyAccountInformation/Container */
@@ -74,8 +73,7 @@ export class MyAccountInformationContainer extends PureComponent {
         showSuccessNotification: PropTypes.func.isRequired,
         updateCustomer: PropTypes.func.isRequired,
         updateCustomerLoadingStatus: PropTypes.func.isRequired,
-        logout: PropTypes.func.isRequired,
-        updateIsLocked: PropTypes.func.isRequired
+        logout: PropTypes.func.isRequired
     };
 
     containerFunctions = {
@@ -100,7 +98,8 @@ export class MyAccountInformationContainer extends PureComponent {
         this.state = {
             showEmailChangeField: false,
             showPasswordChangeField: editPassword,
-            isErrorShow: false
+            isErrorShow: false,
+            isLocked: false
         };
     }
 
@@ -118,9 +117,15 @@ export class MyAccountInformationContainer extends PureComponent {
     }
 
     onError(error) {
-        const { showErrorNotification } = this.props;
+        const { showErrorNotification, updateCustomerLoadingStatus } = this.props;
+        const { isLocked } = this.state;
 
-        showErrorNotification(error);
+        updateCustomerLoadingStatus(false);
+
+        if (!isLocked) {
+            showErrorNotification(error);
+        }
+        this.setState({ isErrorShow: true });
     }
 
     async onCustomerSave(fields) {
@@ -140,40 +145,47 @@ export class MyAccountInformationContainer extends PureComponent {
         }
 
         updateCustomerLoadingStatus(true);
-        try {
-            if (showPasswordChangeField) {
-                await this.handlePasswordChange({ password, newPassword });
-            }
 
-            if (showEmailChangeField) {
-                await this.handleEmailChange({ email, password });
-            }
+        await this.handleInformationChange({ firstname, lastname, taxvat });
 
-            await this.handleInformationChange({ firstname, lastname, taxvat });
-
-            this.handleSuccessChange();
-        } catch (e) {
-            this.handleLockAccount(e);
+        if (showPasswordChangeField) {
+            await this.handlePasswordChange({ password, newPassword });
         }
+
+        if (showEmailChangeField) {
+            await this.handleEmailChange({ email, password });
+        }
+
+        this.afterSubmit();
     }
 
-    handleSuccessChange() {
+    afterSubmit() {
+        const { showSuccessNotification, updateCustomerLoadingStatus, showErrorNotification } = this.props;
         const {
-            showSuccessNotification, updateCustomerLoadingStatus
-        } = this.props;
-        const {
-            showEmailChangeField, showPasswordChangeField
+            isErrorShow, isLocked, showEmailChangeField, showPasswordChangeField
         } = this.state;
 
-        updateCustomerLoadingStatus(false);
+        if (!isErrorShow) {
+            updateCustomerLoadingStatus(false);
 
-        if (showEmailChangeField || showPasswordChangeField) {
-            this.handleLogout({ isFromEmailChange: true });
+            if (showEmailChangeField || showPasswordChangeField) {
+                this.handleLogout({ isFromEmailChange: true });
+            } else {
+                history.push({ pathname: appendWithStoreCode(ACCOUNT_URL) });
+            }
+
+            showSuccessNotification('You saved the account information.');
         } else {
-            history.push({ pathname: appendWithStoreCode(ACCOUNT_URL) });
-        }
+            this.setState({ isErrorShow: false });
 
-        showSuccessNotification(__('You saved the account information.'));
+            if (isLocked) {
+                const message = 'The account sign-in was incorrect or your account is disabled temporarily.'
+                + 'Please wait and try again later.';
+
+                showErrorNotification(message);
+                this.handleLogout({ isFromLocked: true });
+            }
+        }
     }
 
     handleLogout(state) {
@@ -187,46 +199,48 @@ export class MyAccountInformationContainer extends PureComponent {
             pathname: path,
             state
         });
-
         logout();
     }
 
     async handlePasswordChange(passwords) {
         const mutation = MyAccountQuery.getChangeCustomerPasswordMutation(passwords);
 
-        await fetchMutation(mutation);
+        try {
+            await fetchMutation(mutation);
+        } catch (e) {
+            this.onError(e);
+        }
     }
 
-    async handleInformationChange(options) {
+    async handleInformationChange(passwords) {
         const {
             updateCustomer
         } = this.props;
 
-        const mutation = MyAccountQuery.getUpdateInformationMutation(options);
+        const mutation = MyAccountQuery.getUpdateInformationMutation(passwords);
 
-        const { updateCustomerV2: { customer } } = await fetchMutation(mutation);
-        BrowserDatabase.setItem(customer, CUSTOMER, ONE_MONTH_IN_SECONDS);
-        updateCustomer(customer);
+        try {
+            const { updateCustomerV2: { customer } } = await fetchMutation(mutation);
+            BrowserDatabase.setItem(customer, CUSTOMER, ONE_MONTH_IN_SECONDS);
+            updateCustomer(customer);
+        } catch (e) {
+            const { extensions: { category } } = e[0];
+
+            if (category === GRAPHQL_AUTH) {
+                this.setState({ isLocked: true });
+            }
+            this.onError(e);
+        }
     }
 
     async handleEmailChange(fields) {
         const mutation = MyAccountQuery.getUpdateEmailMutation(fields);
 
-        await fetchMutation(mutation);
-    }
-
-    handleLockAccount(e) {
-        const { updateIsLocked, updateCustomerLoadingStatus } = this.props;
-        const { message } = e[0];
-
-        updateCustomerLoadingStatus(false);
-
-        if (message.includes('locked')) {
-            updateIsLocked(true);
-            return;
+        try {
+            await fetchMutation(mutation);
+        } catch (e) {
+            this.onError(e);
         }
-
-        this.onError(e);
     }
 
     handleChangePasswordCheckbox() {

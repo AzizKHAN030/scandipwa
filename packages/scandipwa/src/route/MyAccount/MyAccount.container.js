@@ -16,7 +16,6 @@ import { withRouter } from 'react-router';
 
 import { CUSTOMER_ACCOUNT, CUSTOMER_ACCOUNT_PAGE, CUSTOMER_WISHLIST } from 'Component/Header/Header.config';
 import { updateMeta } from 'Store/Meta/Meta.action';
-import { updateIsLocked } from 'Store/MyAccount/MyAccount.action';
 import { changeNavigationState } from 'Store/Navigation/Navigation.action';
 import { TOP_NAVIGATION_TYPE } from 'Store/Navigation/Navigation.reducer';
 import { showNotification } from 'Store/Notification/Notification.action';
@@ -39,7 +38,7 @@ import history from 'Util/History';
 import { appendWithStoreCode, replace } from 'Util/Url';
 
 import MyAccount from './MyAccount.component';
-import { ACCOUNT_LOGIN_URL, ACCOUNT_URL, LOCKED_ACCOUNT_ERROR_MESSAGE } from './MyAccount.config';
+import { ACCOUNT_LOGIN_URL, ACCOUNT_URL } from './MyAccount.config';
 
 export const BreadcrumbsDispatcher = import(
     /* webpackMode: "lazy", webpackChunkName: "dispatchers" */
@@ -75,8 +74,7 @@ export const mapDispatchToProps = (dispatch) => ({
     showNotification: (type, message) => dispatch(showNotification(type, message)),
     logout: () => MyAccountDispatcher.then(
         ({ default: dispatcher }) => dispatcher.logout(false, false, dispatch)
-    ),
-    updateIsLocked: (isLocked) => dispatch(updateIsLocked(isLocked))
+    )
 });
 
 /** @namespace Route/MyAccount/Container */
@@ -98,8 +96,7 @@ export class MyAccountContainer extends PureComponent {
         baseLinkUrl: PropTypes.string.isRequired,
         showNotification: PropTypes.func.isRequired,
         selectedTab: PropTypes.string,
-        logout: PropTypes.func.isRequired,
-        updateIsLocked: PropTypes.func.isRequired
+        logout: PropTypes.func.isRequired
     };
 
     static defaultProps = {
@@ -258,10 +255,6 @@ export class MyAccountContainer extends PureComponent {
 
         this.redirectIfNotSignedIn();
 
-        if (isLocked) {
-            this.handleLocked();
-        }
-
         if (prevIsSignedInFromState !== currIsSignedInFromState) {
             this.changeMyAccountHeaderState();
         }
@@ -279,6 +272,10 @@ export class MyAccountContainer extends PureComponent {
 
         if (!isSignedIn()) {
             this.changeMyAccountHeaderState();
+        }
+
+        if (isLocked) {
+            this.handleLocked();
         }
     }
 
@@ -489,18 +486,17 @@ export class MyAccountContainer extends PureComponent {
     }
 
     handleLocked() {
-        const {
-            logout, updateIsLocked, baseLinkUrl, showNotification
-        } = this.props;
+        const { baseLinkUrl, logout } = this.props;
 
         const path = baseLinkUrl
             ? appendWithStoreCode(ACCOUNT_LOGIN_URL)
-            : replace(/\/customer\/account\/?.*/i, ACCOUNT_LOGIN_URL);
+            : replace(/\/customer\/account\/.*/, ACCOUNT_LOGIN_URL);
 
-        history.replace({ pathname: path, state: { isFromLocked: true } });
-        showNotification('error', LOCKED_ACCOUNT_ERROR_MESSAGE);
+        history.push({
+            pathname: path,
+            state: { isFromLocked: true }
+        });
         logout();
-        updateIsLocked(false);
     }
     // #endregion
 
