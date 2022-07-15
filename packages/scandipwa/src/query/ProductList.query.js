@@ -490,7 +490,6 @@ export class ProductListQuery {
 
     _getStockItemFields() {
         return [
-            'in_stock',
             'min_sale_qty',
             'max_sale_qty',
             'qty_increments'
