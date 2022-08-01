@@ -39,7 +39,8 @@ export class CartPage extends PureComponent {
         device: DeviceType.isRequired,
         isInitialLoad: PropTypes.bool.isRequired,
         minimumOrderAmountReached: PropTypes.bool,
-        minimumOrderDescription: PropTypes.string
+        minimumOrderDescription: PropTypes.string,
+        areDetailsLoaded: PropTypes.bool
     };
 
     static defaultProps = {
@@ -47,14 +48,17 @@ export class CartPage extends PureComponent {
         onCouponCodeUpdate: noopFn,
         onCartItemLoading: null,
         minimumOrderAmountReached: true,
-        minimumOrderDescription: ''
+        minimumOrderDescription: '',
+        areDetailsLoaded: false
     };
 
     renderCartItems() {
         const {
             totals: {
-                items,
-                quote_currency_code
+                items = [],
+                prices: {
+                    quote_currency_code = ''
+                } = {}
             },
             onCartItemLoading,
             isInitialLoad
@@ -100,7 +104,12 @@ export class CartPage extends PureComponent {
 
     renderDiscountCode() {
         const {
-            totals: { coupon_code, items }
+            totals: {
+                items = [],
+                prices: {
+                    coupon_code
+                } = {}
+            }
         } = this.props;
 
         if (!items || items.length < 1) {
@@ -166,7 +175,7 @@ export class CartPage extends PureComponent {
         return (
             <CheckoutOrderSummary
               totals={ totals }
-                // eslint-disable-next-line react/jsx-no-bind
+              // eslint-disable-next-line react/jsx-no-bind
               renderCmsBlock={ () => this.renderPromo(true) }
               onCouponCodeUpdate={ onCouponCodeUpdate }
               showItems={ false }
@@ -189,10 +198,13 @@ export class CartPage extends PureComponent {
     }
 
     renderCrossSellProducts() {
+        const { areDetailsLoaded } = this.props;
+
         return (
             <ProductLinks
               linkType={ CROSS_SELL }
               title={ __('Frequently bought together') }
+              areDetailsLoaded={ areDetailsLoaded }
             />
         );
     }

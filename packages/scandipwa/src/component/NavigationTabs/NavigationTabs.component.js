@@ -19,6 +19,7 @@ import { DeviceType } from 'Type/Device.type';
 import {
     ACCOUNT_TAB,
     CART_TAB,
+    CHECKOUT_TAB,
     HOME_TAB,
     MENU_TAB
 } from './NavigationTabs.config';
@@ -43,6 +44,9 @@ export class NavigationTabs extends NavigationAbstract {
         [CART_TAB]: {
             minicart: true
         },
+        [CHECKOUT_TAB]: {
+            minicart: true
+        },
         [ACCOUNT_TAB]: {
             account: true
         }
@@ -58,13 +62,13 @@ export class NavigationTabs extends NavigationAbstract {
     shouldComponentUpdate(nextProps) {
         const {
             navigationState: { name: prevName },
-            cartTotals: { items_qty: prevQty },
+            cartTotals: { total_quantity: prevQty },
             device: prevDevice
         } = this.props;
 
         const {
             navigationState: { name: nextName },
-            cartTotals: { items_qty: nextQty },
+            cartTotals: { total_quantity: nextQty },
             device: nextDevice
         } = nextProps;
 

@@ -11,6 +11,7 @@
 
 import { CHECKOUT, MY_ACCOUNT } from 'Component/Header/Header.config';
 import { CONFIRMATION_REQUIRED } from 'Component/MyAccountCreateAccount/MyAccountCreateAccount.config';
+import { ORDER_ID } from 'Component/MyAccountOrder/MyAccountOrder.config';
 import MyAccountQuery from 'Query/MyAccount.query';
 import {
     ACCOUNT_CONFIRMATION_URL,
@@ -40,7 +41,7 @@ import {
     setAuthorizationToken
 } from 'Util/Auth';
 import BrowserDatabase from 'Util/BrowserDatabase';
-import { deleteGuestQuoteId, getGuestQuoteId, setGuestQuoteId } from 'Util/Cart';
+import { deleteCartId, getCartId, setCartId } from 'Util/Cart';
 import { removeUid } from 'Util/Compare';
 import history from 'Util/History';
 import { prepareQuery } from 'Util/Query';
@@ -120,7 +121,7 @@ export class MyAccountDispatcher {
             }
         }
 
-        deleteGuestQuoteId();
+        deleteCartId();
         BrowserDatabase.deleteItem(CUSTOMER);
         removeUid();
 
@@ -193,6 +194,8 @@ export class MyAccountDispatcher {
             (data) => {
                 const { createCustomer: { customer } } = data;
                 const { confirmation_required } = customer;
+
+                sessionStorage.setItem(ORDER_ID, '');
 
                 if (confirmation_required) {
                     dispatch(updateIsLoading(false));
@@ -287,7 +290,7 @@ export class MyAccountDispatcher {
         );
 
         const cartDispatcher = (await CartDispatcher).default;
-        const guestCartToken = getGuestQuoteId();
+        const guestCartToken = getCartId();
         // if customer is authorized, `createEmptyCart` mutation returns customer cart token
         const customerCartToken = await cartDispatcher.createGuestEmptyCart(dispatch);
 
@@ -296,7 +299,7 @@ export class MyAccountDispatcher {
             await cartDispatcher.mergeCarts(guestCartToken, customerCartToken, dispatch);
         }
 
-        setGuestQuoteId(customerCartToken);
+        setCartId(customerCartToken);
         cartDispatcher.updateInitialCartData(dispatch, true);
 
         WishlistDispatcher.then(
